@@ -144,6 +144,7 @@ var Player = function () {
 		this.ctx = board.ctx;
 		this.score = 0;
 		this.linesCleared = 0;
+		this.level = 0;
 		this.isDead = false;
 		this.colorScheme = board.colorScheme;
 		this.board = new _Board2.default(board);
@@ -162,6 +163,30 @@ var Player = function () {
 			}
 		}
 	}, {
+		key: 'rotatePiece',
+		value: function rotatePiece(direction) {
+			//simulating wall-kick effect. not perfect, needs fixing. especially with I shape
+			this.activePiece.rotate(direction);
+			if (this.checkBoardCollision()) {
+				this.movePiece(direction);
+				if (this.checkBoardCollision) {
+					this.movePiece(direction);
+					if (this.checkBoardCollision) {
+						this.movePiece(-direction);
+						this.movePiece(-direction);
+						if (this.checkBoardCollision()) {
+							this.movePiece(-direction);
+							if (this.checkBoardCollision()) {
+								this.movePiece(direction);
+								this.movePiece(direction);
+								this.activePiece.rotate(-direction);
+							}
+						}
+					}
+				}
+			}
+		}
+	}, {
 		key: 'dropPiece',
 		value: function dropPiece() {
 			this.activePiece.y++;
@@ -171,6 +196,19 @@ var Player = function () {
 				this.resetPiece();
 				this.checkCompletedLines();
 			}
+		}
+	}, {
+		key: 'instantDrop',
+		value: function instantDrop() {
+			//create soon
+			while (!this.checkBoardCollision()) {
+				this.activePiece.y++;
+			}
+			//Duplicating code drop above. Should I pull this out into a function.
+			this.activePiece.y--;
+			this.board.mergePiece(this.activePiece);
+			this.resetPiece();
+			this.checkCompletedLines();
 		}
 	}, {
 		key: 'checkBoardCollision',
@@ -345,11 +383,11 @@ var Piece = function () {
 				case 'T':
 					return [[0, 1, 0], [1, 1, 1], [0, 0, 0]];
 				case 'L':
-					return [[0, 2, 0], [0, 2, 0], [0, 2, 2]];
+					return [[0, 0, 2], [2, 2, 2], [0, 0, 0]];
 				case 'O':
 					return [[3, 3], [3, 3]];
 				case 'J':
-					return [[0, 4, 0], [0, 4, 0], [4, 4, 0]];
+					return [[4, 0, 0], [4, 4, 4], [0, 0, 0]];
 				case 'I':
 					return [[0, 5, 0, 0], [0, 5, 0, 0], [0, 5, 0, 0], [0, 5, 0, 0]];
 				case 'S':
@@ -450,10 +488,19 @@ function game() {
 	var lastTime = 0;
 
 	function clsGameActive() {
-		ctx.fillStyle = 'rgba(0,0,0, 1)';
+		//This is the Sidebar color
+		ctx.fillStyle = 'rgba(175,150,200, .3)';
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		//Playing area black
+		ctx.fillStyle = 'rgba(0,0,0, 1)';
+		ctx.fillRect(0, 0, BOARD_WIDTH * BLOCK + 2, BOARD_HEIGHT * BLOCK);
 		ctx.strokeStyle = 'white';
-		ctx.strokeRect(0, 0, BOARD_WIDTH * BLOCK, BOARD_HEIGHT * BLOCK);
+		//Border of playing area
+		ctx.strokeRect(0, 0, BOARD_WIDTH * BLOCK + 2, BOARD_HEIGHT * BLOCK);
+		//Border and fill of preview area
+		ctx.strokeRect(BLOCK * BOARD_WIDTH + 10, 10, 100, 100);
+		ctx.fillStyle = 'rgba(100,100,150, .5)';
+		ctx.fillRect(BLOCK * BOARD_WIDTH + 10, 10, 100, 100);
 	}
 
 	document.addEventListener('keydown', handleKeydown);
@@ -472,10 +519,15 @@ function game() {
 				dropCounter = 0;
 			} else if (event.keyCode === 69) {
 				//'e' for rotate clockwise
-				player.activePiece.rotate(1);
+				player.rotatePiece(1);
 			} else if (event.keyCode === 81) {
 				//'q' for rotate counter-clockwise
-				player.activePiece.rotate(-1);
+				player.rotatePiece(-1);
+			} else if (event.keyCode === 32) {
+				//'Spacebar' for quick drop
+				player.instantDrop();
+			} else if (event.keyCode === 80) {
+				//'p' for pause
 			}
 		}
 	}
@@ -512,10 +564,12 @@ game();
 
 //todo make drop interval dynamic based on player progress and have score increased as
 //a multiplier of that somehow
+//todo, accelerate a fixed number of times with score multiplier increase as well
 
 //todo error checking to prevent rotating into wall
-
-//todo Can't create a new piece when collision, except when pressing down - stop that
+//fixed but maybe want to add a way to move the piece one over instead of just blocking rotation.
+//not sure what is standard in tetris games
+//it's a wall kick
 
 /***/ })
 /******/ ]);
