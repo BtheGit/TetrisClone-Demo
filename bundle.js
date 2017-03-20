@@ -63,7 +63,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 4);
+/******/ 	return __webpack_require__(__webpack_require__.s = 6);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -78,6 +78,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.drawMatrix = drawMatrix;
 exports.canvasText = canvasText;
+exports.cls = cls;
 function drawMatrix(ctx, matrix, position, blockSize) {
 	var colorScheme = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : {
 		pieces: ['red', 'blue', 'purple', 'pink', 'orange', 'indigo', 'green'],
@@ -110,6 +111,11 @@ function canvasText(ctx, text) {
 	ctx.fillText(text, startX, startY, 80);
 }
 
+function cls(canvas) {
+	canvas.ctx.fillStyle = 'black';
+	canvas.ctx.fillRect(0, 0, canvas.CANVAS_WIDTH, canvas.CANVAS_HEIGHT);
+}
+
 /***/ }),
 /* 1 */
 /***/ (function(module, exports, __webpack_require__) {
@@ -123,11 +129,11 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _Board = __webpack_require__(2);
+var _Board = __webpack_require__(4);
 
 var _Board2 = _interopRequireDefault(_Board);
 
-var _Piece = __webpack_require__(3);
+var _Piece = __webpack_require__(5);
 
 var _Piece2 = _interopRequireDefault(_Piece);
 
@@ -138,16 +144,16 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Player = function () {
-	function Player(board) {
+	function Player(props) {
 		_classCallCheck(this, Player);
 
-		this.ctx = board.ctx;
+		this.ctx = props.ctx;
 		this.score = 0;
 		this.linesCleared = 0;
 		this.level = 0;
 		this.isDead = false;
-		this.colorScheme = board.colorScheme;
-		this.board = new _Board2.default(board);
+		this.colorScheme = props.colorScheme;
+		this.board = new _Board2.default(props);
 		this.activePiece = new _Piece2.default(this.board);
 		this.nextPiece = new _Piece2.default(this.board);
 		this.nextPiece.x = this.board.width + 2;
@@ -290,19 +296,130 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 var _utilities = __webpack_require__(0);
 
+var _Player = __webpack_require__(1);
+
+var _Player2 = _interopRequireDefault(_Player);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Game = function () {
+	function Game(props) {
+		_classCallCheck(this, Game);
+
+		this.props = props;
+		this.player = new _Player2.default(props);
+
+		//Used to control drop timing
+		this.DROP_INIT = 1000;
+		this.DROP_MAX = 50;
+
+		this.speedModifier = 1;
+
+		this.dropInterval = this.DROP_INIT; //in milliseconds
+		this.dropCounter = 0;
+		this.lastTime = 0;
+
+		this.gameActive = this.gameActive.bind(this);
+
+		this.gameActive();
+	}
+
+	_createClass(Game, [{
+		key: 'drawGameBG',
+		value: function drawGameBG() {
+			var ctx = this.props.ctx;
+			//This is the Sidebar color
+			ctx.fillStyle = 'rgba(175,150,200, .3)';
+			ctx.fillRect(0, 0, this.props.CANVAS_WIDTH, this.props.CANVAS_HEIGHT);
+			//Playing area black
+			ctx.fillStyle = 'rgba(0,0,0, 1)';
+			ctx.fillRect(0, 0, this.props.BOARD_WIDTH * this.props.TILESIZE + 2, this.props.BOARD_HEIGHT * this.props.TILESIZE);
+			ctx.strokeStyle = 'white';
+			//Border of playing area
+			ctx.strokeRect(0, 0, this.props.BOARD_WIDTH * this.props.TILESIZE + 2, this.props.BOARD_HEIGHT * this.props.TILESIZE);
+			//Border and fill of preview area
+			ctx.strokeRect(this.props.TILESIZE * this.props.BOARD_WIDTH + 10, 10, 100, 100);
+			ctx.fillStyle = 'rgba(100,100,150, .5)';
+			ctx.fillRect(this.props.TILESIZE * this.props.BOARD_WIDTH + 10, 10, 100, 100);
+		}
+
+		//going to have to decide if I want to use global eventlisteners again or component 
+		//ones that are deleted when component is unmounted (perhaps by storing them in
+		//global array and iterating through that deleting everything in when moving to 
+		//next screen OR by having global eventlistener function that I overwrite at beginning
+		//of each component lifecycle)
+
+	}, {
+		key: 'gameActive',
+		value: function gameActive() {
+			var time = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+
+			(0, _utilities.cls)(this.props);
+			this.dropInterval = this.updateDropInterval();
+			//is time argument baked into requestAnimationFrame? Seems like it must be.
+			var deltaTime = time - this.lastTime;
+			this.lastTime = time;
+			this.dropCounter += deltaTime;
+			if (this.dropCounter > this.dropInterval) {
+				if (!this.player.isDead) {
+					this.player.dropPiece();
+					this.dropCounter = 0;
+				}
+			}
+			this.drawGameBG();
+			this.player.board.render();
+			this.player.render();
+			requestAnimationFrame(this.gameActive);
+		}
+	}, {
+		key: 'updateDropInterval',
+		value: function updateDropInterval() {
+			// if (player.linesCleared )
+			return this.DROP_INIT * this.speedModifier;
+		}
+	}]);
+
+	return Game;
+}();
+
+exports.default = Game;
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports) {
+
+// removed by extract-text-webpack-plugin
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _utilities = __webpack_require__(0);
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Board = function () {
-	function Board(board) {
+	function Board(props) {
 		_classCallCheck(this, Board);
 
 		//should start tracking x/y for multiple boards later
-		this.width = board.width;
-		this.height = board.height;
-		this.tileSize = board.tileSize;
-		this.ctx = board.ctx;
+		this.width = props.BOARD_WIDTH;
+		this.height = props.BOARD_HEIGHT;
+		this.tileSize = props.TILESIZE;
+		this.ctx = props.ctx;
 		this.matrix = this.generateEmptyBoard();
-		this.colorScheme = board.colorScheme;
+		this.colorScheme = props.colorScheme;
 	}
 
 	_createClass(Board, [{
@@ -338,7 +455,7 @@ var Board = function () {
 exports.default = Board;
 
 /***/ }),
-/* 3 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -430,7 +547,7 @@ var Piece = function () {
 exports.default = Piece;
 
 /***/ }),
-/* 4 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -440,127 +557,105 @@ var _Player = __webpack_require__(1);
 
 var _Player2 = _interopRequireDefault(_Player);
 
+var _Game = __webpack_require__(2);
+
+var _Game2 = _interopRequireDefault(_Game);
+
 var _utilities = __webpack_require__(0);
+
+__webpack_require__(3);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 //Since tetris works in blocks, instead of changing the canvas context proportions 20:1
 //(which I assume means overlaying text would require a second canvas rendering), let's
 //define a block size and do all calculations with that.
-var BLOCK = 20;
-var LEFT_OFFSET = 200;
-var TOP_OFFSET = 50;
+var TILESIZE = 20;
 var BOARD_WIDTH = 12;
 var BOARD_HEIGHT = 20;
 
 //get the canvas context
-var CANVAS_WIDTH = BLOCK * (BOARD_WIDTH + 6);
-var CANVAS_HEIGHT = BLOCK * BOARD_HEIGHT;
+var CANVAS_WIDTH = TILESIZE * (BOARD_WIDTH + 6);
+var CANVAS_HEIGHT = TILESIZE * BOARD_HEIGHT;
 
-var canvas = document.getElementById('gameCanvas');
-canvas.width = CANVAS_WIDTH;
-canvas.height = CANVAS_HEIGHT;
+//Array to store active instances of Games
+var players = [];
 
-//#### GAME STATE ####
-var ctx = canvas.getContext('2d');
-var defaultColorScheme = {
-	pieces: ['red', 'blue', 'purple', 'pink', 'orange', 'indigo', 'green'],
-	outline: 'black'
-};
+var playerElements = document.querySelectorAll('.player');
 
-function game() {
-	//going to have to decide if I want to use global eventlisteners again or component 
-	//ones that are deleted when component is unmounted (perhaps by storing them in
-	//global array and iterating through that deleting everything in when moving to 
-	//next screen OR by having global eventlistener function that I overwrite at beginning
-	//of each component lifecycle)
+playerElements.forEach(function (elem) {
 
-	var player = new _Player2.default({ width: BOARD_WIDTH, height: BOARD_HEIGHT, tileSize: BLOCK, colorScheme: defaultColorScheme, ctx: ctx });
+	//create individual canvases
+	var canvas = elem.querySelector('.gameCanvas');
+	canvas.width = CANVAS_WIDTH;
+	canvas.height = CANVAS_HEIGHT;
+	var ctx = canvas.getContext('2d');
 
-	//Used to control drop timing
-	var DROP_INIT = 1000;
-	var DROP_MAX = 50;
+	//create a bundle 
+	var canvasProps = {
+		CANVAS_WIDTH: CANVAS_WIDTH,
+		CANVAS_HEIGHT: CANVAS_HEIGHT,
+		ctx: ctx,
+		TILESIZE: TILESIZE,
+		BOARD_HEIGHT: BOARD_HEIGHT,
+		BOARD_WIDTH: BOARD_WIDTH,
+		colorScheme: {
+			pieces: ['red', 'blue', 'purple', 'pink', 'orange', 'indigo', 'green'],
+			outline: 'black'
+		}
+	};
 
-	var speedModifier = 1;
+	//initiate new game 
+	var player = new _Game2.default(canvasProps);
+	players.push(player);
+});
 
-	var dropInterval = DROP_INIT; //in milliseconds
-	var dropCounter = 0;
-	var lastTime = 0;
+var playerKeys = [{
+	left: 65,
+	right: 68,
+	down: 83,
+	drop: 32,
+	rotateClock: 69,
+	rotateCount: 81
+}, {
+	left: 37,
+	right: 39,
+	down: 40,
+	drop: 16,
+	rotateClock: 191,
+	rotateCount: 190
+}];
 
-	function clsGameActive() {
-		//This is the Sidebar color
-		ctx.fillStyle = 'rgba(175,150,200, .3)';
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
-		//Playing area black
-		ctx.fillStyle = 'rgba(0,0,0, 1)';
-		ctx.fillRect(0, 0, BOARD_WIDTH * BLOCK + 2, BOARD_HEIGHT * BLOCK);
-		ctx.strokeStyle = 'white';
-		//Border of playing area
-		ctx.strokeRect(0, 0, BOARD_WIDTH * BLOCK + 2, BOARD_HEIGHT * BLOCK);
-		//Border and fill of preview area
-		ctx.strokeRect(BLOCK * BOARD_WIDTH + 10, 10, 100, 100);
-		ctx.fillStyle = 'rgba(100,100,150, .5)';
-		ctx.fillRect(BLOCK * BOARD_WIDTH + 10, 10, 100, 100);
-	}
+document.addEventListener('keydown', handleKeydown);
 
-	document.addEventListener('keydown', handleKeydown);
-
-	function handleKeydown(event) {
+function handleKeydown(event) {
+	playerKeys.forEach(function (key, index) {
+		var player = players[index].player;
 		if (!player.isDead) {
-			if (event.keyCode === 65) {
+			if (event.keyCode === key.left) {
 				//'a'
 				player.movePiece(-1);
-			} else if (event.keyCode === 68) {
+			} else if (event.keyCode === key.right) {
 				//'d'
 				player.movePiece(1);
-			} else if (event.keyCode === 83) {
+			} else if (event.keyCode === key.down) {
 				//'s' accelerate drop
 				player.dropPiece();
-				dropCounter = 0;
-			} else if (event.keyCode === 69) {
+			} else if (event.keyCode === key.rotateClock) {
 				//'e' for rotate clockwise
 				player.rotatePiece(1);
-			} else if (event.keyCode === 81) {
+			} else if (event.keyCode === key.rotateCount) {
 				//'q' for rotate counter-clockwise
 				player.rotatePiece(-1);
-			} else if (event.keyCode === 32) {
+			} else if (event.keyCode === key.drop) {
 				//'Spacebar' for quick drop
 				player.instantDrop();
 			} else if (event.keyCode === 80) {
 				//'p' for pause
 			}
 		}
-	}
-
-	function gameActive() {
-		var time = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
-
-		clsGameActive();
-		dropInterval = updateDropInterval();
-		//is time argument baked into requestAnimationFrame? Seems like it must be.
-		var deltaTime = time - lastTime;
-		lastTime = time;
-		dropCounter += deltaTime;
-		if (dropCounter > dropInterval) {
-			if (!player.isDead) {
-				player.dropPiece();
-				dropCounter = 0;
-			}
-		}
-		player.board.render();
-		player.render();
-		requestAnimationFrame(gameActive);
-	}
-
-	function updateDropInterval() {
-		// if (player.linesCleared )
-		return DROP_INIT * speedModifier;
-	}
-
-	gameActive();
+	});
 }
-
-game();
 
 //todo make drop interval dynamic based on player progress and have score increased as
 //a multiplier of that somehow

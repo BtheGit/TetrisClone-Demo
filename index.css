@@ -1,0 +1,22 @@
+* {
+	padding: 0;
+	margin: 0;
+}
+
+.flex-container {
+	display: flex;
+	flex-direction: row;
+}
+
+.player {
+	flex: 1 1 auto;
+}
+
+h4 {
+	display: inline;
+}
+
+span {
+	display: inline;
+}
+/*# sourceMappingURL=bundle.map*/
